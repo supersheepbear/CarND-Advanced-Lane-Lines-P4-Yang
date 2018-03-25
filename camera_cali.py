@@ -1,6 +1,7 @@
 import cv2
 import os
 import glob
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -17,7 +18,7 @@ class CameraCalibration:
     def camera_calibration_main(self):
         self.open_images()
         self.find_chessboard_corners()
-        self.get_undistort_images()
+        self.get_undistort_cali_images()
 
     def open_images(self):
         """Read in all calibration images
@@ -43,11 +44,11 @@ class CameraCalibration:
                 self.imgpoints.append(corners)
                 self.objpoints.append(objpoints)
 
-    def get_undistort_images(self):
+    def get_undistort_cali_images(self):
         """Undistort images if corners found
         """
         # Create a folder to save images
-        undistort_directory = 'undistorted_images\\'
+        undistort_directory = 'output_images\\undist_calibration_images\\'
         if not os.path.exists(undistort_directory):
             os.makedirs(undistort_directory)
 
@@ -61,6 +62,11 @@ class CameraCalibration:
             pure_filename = filename[filename.rfind('\\')+1:]
             undistort_filename = ''.join([undistort_directory, pure_filename])
             plt.imsave(undistort_filename, undistorted_img)
+
+        # Save calibration matrix and distortion coefficients to local dictionary
+        camera_cali_paras = {'mtx': mtx, 'dist': dist}
+        with open('camera_cali_parameters.pickle', 'wb') as handle:
+            pickle.dump(camera_cali_paras, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def main():
