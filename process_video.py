@@ -58,16 +58,54 @@ class FrameInfo():
         self.warp_image = None
         self.undistort_image = None
 
+    def get_curvature(self):
+        y_eval = self.warp_image.shape[0] - 1
+        # Define conversions in x and y from pixels space to meters
+        ym_per_pix = 30/720. # meters per pixel in y dimension
+        xm_per_pix = 3.7/700. # meters per pixel in x dimension
+
+
+        mx = xm_per_pix
+        my = ym_per_pix
+        left_fit_cr = [mx / (my ** 2) * self.left_best_fit[0], (mx/my) * self.left_best_fit[1], self.left_best_fit[2]]
+        right_fit_cr = [mx / (my ** 2) * self.right_best_fit[0], (mx/my) * self.right_best_fit[1], self.right_best_fit[2]]
+        # Calculate the new radii of curvature
+        left_curverad_meter  = ((1 + (2 * left_fit_cr[0] * y_eval + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
+        right_curverad_meter  = ((1 + (2 * right_fit_cr[0] * y_eval + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit_cr[0])
+        #print(left_curverad_meter, 'm', right_curverad_meter, 'm')
+        left_curvature = left_curverad_meter
+        right_curvature = right_curverad_meter
+        self.curvature = (left_curvature + right_curvature)/2
+
+        # find end vehicle position
+        left_x = self.left_best_fit[0] * (y_eval** 2) + self.left_best_fit[1] * y_eval + self.left_best_fit[2]
+        right_x = self.right_best_fit[0] * (y_eval** 2) + self.right_best_fit[1] * y_eval + self.right_best_fit[2]
+        self.line_base_pos = (self.warp_image.shape[1]/2 - (left_x + right_x)/2) * mx
+
     def cycle_update(self):
         self.cycle += 1
 
+        if len(self.left_recent_xfitted) >= 5:
+            self.left_best_fit = np.sum(self.left_recent_xfitted, axis=0)/5 * 0.5 + self.left_fit * 0.5
+            self.right_best_fit = np.sum(self.right_recent_xfitted, axis=0)/5 * 0.5 + self.right_fit * 0.5
+            self.left_recent_xfitted.pop(0)
+            self.right_recent_xfitted.pop(0)
+
+        else:
+            self.left_best_fit = self.left_fit
+            self.right_best_fit = self.right_fit
+        self.left_recent_xfitted.append(np.array(self.left_fit))
+        self.right_recent_xfitted.append(np.array(self.right_fit))
+
     def draw_line_area(self):
+        self.cycle_update()
+        self.get_curvature()
         # Create an image to draw the lines on
         warped = self.warp_image[:, :, 0]
         warp_zero = np.zeros_like(warped).astype(np.uint8)
         color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
         #ploty = np.linspace(0, warped.shape[0] - 1, num=warped.shape[0])
-        ploty = np.linspace(360, warped.shape[0] - 1, (warped.shape[0]-360))
+        ploty = np.linspace(0, warped.shape[0] - 1, (warped.shape[0]))
         if len(self.left_fit) != 0 and len(self.right_fit) != 0:
             left_fitx = self.left_fit[0] * ploty ** 2 + self.left_fit[1] * ploty + self.left_fit[2]
             right_fitx = self.right_fit[0] * ploty ** 2 + self.right_fit[1] * ploty + self.right_fit[2]
@@ -87,11 +125,12 @@ class FrameInfo():
             # Combine the result with the original image
             #print(newwarp.shape)
             result = cv2.addWeighted(self.undistort_image, 1, newwarp, 0.3, 0)
-            plt.imshow(result)
-            plt.text(100, 200, 'curvature: {:.1f} m'.format(self.curvature), style='italic', size='10' )
-            plt.text(100, 250, 'vehicle position: {:.4f} m'.format(self.line_base_pos), style='italic', size='10')
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(result, 'curvature: {:.1f} m'.format(self.curvature), (230, 50), font, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(result, 'vehicle position: {:.4f} m'.format(self.line_base_pos), (230, 80), font, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+            #plt.imshow(result)
 
-            plt.imsave('new_warp.jpg', result)
+            #plt.imsave('new_warp.jpg', result)
             return result
         else:
             return self.undistort_image
