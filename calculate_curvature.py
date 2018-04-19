@@ -130,7 +130,7 @@ class FindCurvature:
         plt.xlim(0, 1280)
         plt.ylim(720, 0)
         pure_file_name = self.image_name[self.image_name.rfind('\\') + 1:]
-        plt.savefig(''.join([self.curve_fit_image_path, '\\', pure_file_name]))
+        #plt.savefig(''.join([self.curve_fit_image_path, '\\', pure_file_name]))
         plt.clf()
 
     def get_curvature(self):
